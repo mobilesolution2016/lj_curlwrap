@@ -8,6 +8,7 @@
 #	undef max
 #	define MAP_CLASSNAME std::map
 #	define strlwr _strlwr
+#	define strnicmp _strnicmp
 #else
 #	include <signal.h>
 #	include <unistd.h>
@@ -31,6 +32,8 @@ static inline char* strlwr(char* str)
 	}
 	return str;
 }
+
+#define strnicmp strncasecmp
 #endif
 
 #include <algorithm>
@@ -152,9 +155,40 @@ static int luacurl_new(lua_State* L)
 	new (cu) CURLUserData();
 	lua_rawseti(L, -2, CUDATA_INDEX);
 
-	cu->curl = curlInitOne(cu);
+	curlInitOne(cu);
 
 	return 1;
+}
+
+static int luacurl_get(lua_State* L)
+{
+	size_t len = 0;
+	std::string strOut;
+	struct curl_slist *headers = NULL;
+	const char* url = luaL_checklstring(L, 1, &len);
+	const char* agent = lua_tostring(L, 2);
+
+	CURL* c = curlInitOne(NULL);
+	curlSetUrl(c, url);
+
+	if (agent)
+		headers = curl_setuseragent(headers, agent);
+
+	CURLcode res = curlExecOne(c, strOut);
+
+	if (res == CURLE_OK)
+	{
+		lua_pushboolean(L, 1);
+		lua_pushlstring(L, strOut.c_str(), strOut.length());
+	}
+	else
+	{
+		lua_pushboolean(L, 0);
+		const char* err = p_curl_easy_strerror(res);
+		lua_pushstring(L, err);
+	}
+
+	return 2;
 }
 
 static int luacurl_addheader(lua_State* L)
@@ -235,6 +269,16 @@ static int luacurl_setpost(lua_State* L)
 
 	lua_pushinteger(L, len);
 	return len;
+}
+
+static int luacurl_setbrowser(lua_State* L)
+{
+	ENTRY_CHECK();
+
+	const char* agent = luaL_checkstring(L, 2);
+	cu->appendHeaders = curl_setuseragent(cu->appendHeaders, agent);
+
+	return 0;
 }
 
 static int luacurl_settext(lua_State* L)
@@ -381,6 +425,7 @@ extern "C" __declspec(dllexport) int luaopen_libcurlwrap(lua_State* L)
 	const luaL_Reg gblProcs[] = {
 		// ×Ö·û´®ÇÐ·Ö
 		{ "new", &luacurl_new },
+		{ "get", &luacurl_get },
 		{ NULL }
 	} ;
 
@@ -388,6 +433,7 @@ extern "C" __declspec(dllexport) int luaopen_libcurlwrap(lua_State* L)
 		{ "addfile", &luacurl_addfile },
 		{ "addvar", &luacurl_addvar },
 		{ "setpost", &luacurl_setpost },
+		{ "setbrowser", &luacurl_setbrowser },
 		{ "addheader", &luacurl_addheader },
 		{ "run", &luacurl_run },
 		{ "release", &luacurl_release },

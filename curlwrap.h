@@ -187,6 +187,15 @@ static int curl_progress(void *userp, double dltotal, double dlnow, double ultot
 	return 0;
 }
 
+static struct curl_slist* curl_setuseragent(struct curl_slist* headers, const char* agent)
+{
+	if (strcmp(agent, "chrome") == 0)
+		return p_curl_slist_append(headers, "User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.98 Safari/537.36");
+	else if (strcmp(agent, "firefox"))
+		return p_curl_slist_append(headers, "User-Agent: Mozilla/s.0 (Windows NT 10.0; Win64; x64; rv:52.0) Gecko/20100101 Firefox/52.0");
+	return headers;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static CURL* curlInitOne(CURLUserData* user)
@@ -390,8 +399,22 @@ static CURLcode curlExecOne(CURL* curl, FILE* fp, bool autoClean = true)
 
 static CURLcode curlExecOne(CURLUserData* user)
 {
+	bool ug = false;
 	if (user->appendHeaders)
-		p_curl_easy_setopt(user->curl, CURLOPT_HTTPHEADER, user->appendHeaders);
+	{		
+		struct curl_slist* next = user->appendHeaders;
+		while(next)
+		{
+			if (strnicmp(next->data, "User-Agent", 10) == 0)
+				ug = true;
+			next = next->next;
+		}
+	}
+
+	if (!ug)
+		user->appendHeaders = curl_setuseragent(user->appendHeaders, "chrome");
+
+	p_curl_easy_setopt(user->curl, CURLOPT_HTTPHEADER, user->appendHeaders);
 
 	if (user->szBoundary[0])
 	{
