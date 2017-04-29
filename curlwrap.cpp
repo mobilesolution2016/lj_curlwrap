@@ -400,6 +400,29 @@ static int luacurl_release(lua_State* L)
 	return 0;
 }
 
+static int luacurl_set(lua_State* L)
+{
+	ENTRY_CHECK();
+
+	size_t len;
+	const char* key = lua_tostring(L, 2);
+
+	if (strcmp(key, "dumpupload") == 0)
+	{		
+		const char* val = luaL_checklstring(L, 3, &len);
+		cu->strDumpUpload.clear();
+		cu->strDumpUpload.append(val, len);
+	}
+	else if (strcmp(key, "dumpresponse") == 0)
+	{
+		const char* val = luaL_checklstring(L, 3, &len);
+		cu->strDumpResponse.clear();
+		cu->strDumpResponse.append(val, len);
+	}
+
+	return 0;
+}
+
 #ifdef _WINDOWS
 struct InitLib
 {
@@ -437,6 +460,7 @@ extern "C" __declspec(dllexport) int luaopen_libcurlwrap(lua_State* L)
 		{ "addheader", &luacurl_addheader },
 		{ "run", &luacurl_run },
 		{ "release", &luacurl_release },
+		{ "set", &luacurl_set },
 		{ NULL }
 	} ;
 
