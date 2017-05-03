@@ -258,14 +258,46 @@ static int luacurl_setpost(lua_State* L)
 {
 	ENTRY_CHECK();
 
-	size_t len = 0;
-	const char* posts = luaL_checklstring(L, 2, &len);
-
 	CHECK_ENCTYPE(kContentURLEncoded);
 
 	cu->strUpload.clear();
-	len = urlEncode(posts, len, cu->strUpload);
-	curlSetPostData(cu->curl, cu->strUpload.c_str(), len);
+	
+	size_t len = 0;
+	int tp = lua_type(L, 2);
+	if (tp == LUA_TSTRING)
+	{
+		// must be url-encoded
+		const char* posts = lua_tolstring(L, 2, &len);
+		curlSetPostData(cu->curl, cu->strUpload.c_str(), len);
+	}
+	else if (tp == LUA_TTABLE)
+	{
+		// url-encode for each
+		int cc = 0;
+		size_t namelen;
+
+		lua_pushnil(L);
+		while(lua_next(L, 2))
+		{
+			namelen = len = 0;
+			const char* name = lua_tostring(L, -2, &namelen);
+			const char* val = lua_tolstring(L, -1, &len);
+
+			if (namelen && len)
+			{
+				if (cc ++)
+					cu->strUpload += '&';
+
+				cu->strUpload.append(name, namelen);
+				cu->strUpload += '=';
+				urlEncode(val, len, cu->strUpload);
+			}
+			lua_pop(L, 1);
+		}
+
+		len = cu->strUpload.length();
+		curlSetPostData(cu->curl, cu->strUpload.c_str(), len);
+	}
 
 	lua_pushinteger(L, len);
 	return len;
@@ -418,6 +450,10 @@ static int luacurl_set(lua_State* L)
 		const char* val = luaL_checklstring(L, 3, &len);
 		cu->strDumpResponse.clear();
 		cu->strDumpResponse.append(val, len);
+	}
+	else if (strcmp(key, "verbose") == 0)
+	{
+		cu->verbose = lua_toboolean(L, 3) == 1;
 	}
 
 	return 0;

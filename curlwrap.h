@@ -69,6 +69,7 @@ public:
 	double				dNow, dTotal, dProgressNow;
 	char				szBoundary[34];
 	ContentType			kCntType;
+	bool				verbose;
 	struct curl_slist	*appendHeaders;
 	struct curl_httppost *formpost;
 	std::string			strUpload;
@@ -78,6 +79,7 @@ public:
 public:
 	CURLUserData()
 		: curlSocket(-1)
+		, verbose(false)
 		, kCntType(kContentNotSet)
 		, formpost(NULL), appendHeaders(NULL)
 		, curl(NULL), dProgressNow(0), dNow(0), dTotal(0)
@@ -427,19 +429,20 @@ static CURLcode curlExecOne(CURLUserData* user)
 		p_curl_easy_setopt(user->curl, CURLOPT_POST, 1);
 		p_curl_easy_setopt(user->curl, CURLOPT_POSTFIELDS, cnt.c_str());
 		p_curl_easy_setopt(user->curl, CURLOPT_POSTFIELDSIZE, cnt.length());
+	}
 
-		if (user->strDumpUpload.length())
+	if (user->strDumpUpload.length())
+	{
+		FILE* fp = fopen(user->strDumpUpload.c_str(), "wb");
+		if (fp)
 		{
-			FILE* fp = fopen(user->strDumpUpload.c_str(), "wb");
-			if (fp)
-			{
-				fwrite(user->strUpload.c_str(), 1, user->strUpload.length(), fp);
-				fclose(fp);
-			}
+			fwrite(user->strUpload.c_str(), 1, user->strUpload.length(), fp);
+			fclose(fp);
 		}
 	}
 
-	p_curl_easy_setopt(user->curl, CURLOPT_VERBOSE, 1);
+	if (user->verbose)
+		p_curl_easy_setopt(user->curl, CURLOPT_VERBOSE, 1);
 
 	user->strResponse.reserve(16384);
 	user->strResponse.clear();
